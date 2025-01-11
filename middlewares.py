@@ -16,7 +16,9 @@ class ProfileRequiredMiddleware(BaseMiddleware):
         if event.text and event.text.startswith("/"):
             text = event.text.replace("/", "")
             user_id = event.from_user.id
-            if not text.startswith((START, SET_PROFILE)) and not is_user_exists(user_id):
+            if (not text.startswith((START, SET_PROFILE))
+                    and not text.startswith((START, HELP))
+                    and not is_user_exists(user_id)):
                 await event.answer(
                     "Пожалуйста, сначала настройте профиль с помощью команды /set_profile."
                 )

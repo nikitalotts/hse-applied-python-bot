@@ -1,4 +1,5 @@
-from datetime import datetime, date
+import random
+from datetime import datetime, date, timedelta
 from api import WeatherApiClient
 from config import OPEN_WEATHER_MAP_TOKEN
 
@@ -106,3 +107,14 @@ def get_user_daily_calorie_goal(user_id: int):
 
 def get_user_daily_water_goal(user_id: int):
     return users[user_id]['daily_norm']['water_goal']
+
+async def generate_fake_date(user_id: int, days_before: int):
+    for day_before in range(days_before):
+        day = datetime.now().date() - timedelta(days=day_before)
+        ensure_statistics_exists(user_id, day)
+
+        # add random amount of calories
+        add_calories(user_id, day, random.randint(1000, 5000))
+
+        # add random amount of water
+        add_water(user_id, day, random.randint(1000, 5000))

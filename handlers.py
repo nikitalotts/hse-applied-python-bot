@@ -1,6 +1,3 @@
-
-import random
-from datetime import datetime, date, timedelta
 from aiogram import Router, Dispatcher
 from aiogram import types, F
 from aiogram.fsm.context import FSMContext
@@ -8,8 +5,9 @@ from aiogram.types import BufferedInputFile
 from aiogram.filters import Command, CommandObject
 from states import ProfileSetup, FoodLogging
 from commands import *
-from helper import *
+from utils import *
 from users import *
+from config import ADMIN_USER_ID
 
 router = Router()
 
@@ -19,6 +17,24 @@ async def start(message: types.Message):
     log_command(START, message.from_user.id, message.from_user.username)
     await message.answer("Привет! Я помогу тебе рассчитать нормы воды и калорий. "
                          "Используй /help для списка команд.")
+
+
+@router.message(Command(HELP))
+async def help(message: types.Message):
+    log_command(HELP, message.from_user.id, message.from_user.username)
+    await message.answer(
+        "Список доступных команд:\n\n"
+        "/start — Начать работу с ботом\n"
+        "/help — Список доступных команд\n"
+        "/set_profile — Настроить профиль (без выполнения это команды остальные работать не будут)\n"
+        "/log_water <объем> — Записать количество выпитой воды (в мл)\n"
+        "/log_food <название продукта> — Записать продукт и его количество\n"
+        "/log_workout <активность> <время> — Записать тренировку\n"
+        "/check_progress — Проверить прогресс за сегодня\n"
+        "/show_water_chart — Показать график потребления воды\n"
+        "/show_calories_chart — Показать график потребления калорий\n"
+        f"{'/fake — (Служ.) Сгенерировать тестовые данные для графика' if message.from_user.id == ADMIN_USER_ID else ''}"
+    )
 
 
 @router.message(Command(SET_PROFILE))
@@ -270,28 +286,14 @@ async def log_food_amount(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-@router.message(Command("users"))
-async def temp(message: types.Message):
-    x = users
-    await message.reply(str(x))
-
-
-@router.message(Command("fake"))
+@router.message(Command(FAKE))
 async def fake(message: types.Message):
-    await generate_fake_date(message.from_user.id, 7)
-    await message.reply("ok")
-
-
-async def generate_fake_date(user_id: int, days_before: int):
-    for day_before in range(days_before):
-        day = datetime.now().date() - timedelta(days=day_before)
-        ensure_statistics_exists(user_id, day)
-
-        # add random amount of calories
-        add_calories(user_id, day, random.randint(1000, 5000))
-
-        # add random amount of water
-        add_water(user_id, day, random.randint(1000, 5000))
+    log_command(FAKE, message.from_user.id, message.from_user.username)
+    user_id = message.from_user.id
+    if user_id != ADMIN_USER_ID:
+        return
+    await generate_fake_date(user_id, 7)
+    await message.reply("Тестовые данные сгенерированы")
 
 
 def setup_handlers(dp: Dispatcher):

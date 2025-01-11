@@ -2,9 +2,7 @@ import io
 import matplotlib.pyplot as plt
 from logger import get_logger
 from config import OPEN_WEATHER_MAP_TOKEN, WORKOUT_API_TOKEN
-from api import WeatherApiClient
-from api import WorkoutApiClient, ProductsApiClient
-from config import WORKOUT_API_TOKEN
+from api import WeatherApiClient, WorkoutApiClient, ProductsApiClient
 from users import get_user_daily_calorie_goal, get_user_daily_water_goal
 
 weather_client = WeatherApiClient(OPEN_WEATHER_MAP_TOKEN)
@@ -72,5 +70,4 @@ async def check_city(city: str):
     city = city.lower().capitalize().strip()
     if not city.isalpha() or await weather_client.is_city_exists(city):
         return None
-
     return city
