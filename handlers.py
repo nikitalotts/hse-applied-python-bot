@@ -1,97 +1,31 @@
-import io
+
 import random
-import matplotlib.pyplot as plt
 from datetime import datetime, date, timedelta
 from aiogram import Router, Dispatcher
-from aiogram import Bot, types, F
+from aiogram import types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.filters import Command, CommandObject
 from states import ProfileSetup, FoodLogging
 from commands import *
-from api import WeatherApiClient, WorkoutApiClient, ProductsApiClient
-from config import OPEN_WEATHER_MAP_TOKEN, WORKOUT_API_TOKEN
+from helper import *
+from users import *
 
 router = Router()
-weather_client = WeatherApiClient(OPEN_WEATHER_MAP_TOKEN)
-workout_client = WorkoutApiClient(WORKOUT_API_TOKEN)
-product_client = ProductsApiClient()
-
-users = {}
 
 
 @router.message(Command(START))
-async def start(message: types.Message, state: FSMContext):
+async def start(message: types.Message):
+    log_command(START, message.from_user.id, message.from_user.username)
     await message.answer("Привет! Я помогу тебе рассчитать нормы воды и калорий. "
                          "Используй /help для списка команд.")
-    #await state.clear()
-
-
-def parse_numeric_value(value: str):
-    try:
-        return float(value)
-    except Exception as e:
-        print(e)
-        return None
-
-
-def parse_and_validate(value: str, lower_bound: int, upper_bound: int):
-    numeric_value = parse_numeric_value(value)
-
-    if numeric_value and lower_bound < numeric_value < upper_bound:
-        return numeric_value
-
-    return None
 
 
 @router.message(Command(SET_PROFILE))
 async def set_profile(message: types.Message, state: FSMContext):
+    log_command(SET_PROFILE, message.from_user.id, message.from_user.username)
     await message.answer("Введите ваш вес (в кг):")
     await state.set_state(ProfileSetup.weight)
-
-
-@router.message(Command("temp"))
-async def temp(message: types.Message, state: FSMContext):
-    x = users
-    await message.reply(str(x))
-
-
-@router.message(Command("fake"))
-async def fake(message: types.Message):
-    await generate_fake_date(message.from_user.id, 7)
-    await message.reply("ok")
-
-
-@router.message(Command(SHOW_WATER_CHART))
-async def fake(message: types.Message):
-    user_id = message.from_user.id
-
-    if get_active_days(user_id) < 2:
-        await message.answer("Данная функция пока недоступна, Вы должны иметь не менее 2 активных дней.")
-        return
-
-    dates, logged_water = get_stats(user_id, 'logged_water')
-    graph_image = create_water_chart(user_id, dates, logged_water)
-    await message.reply_photo(
-        photo=BufferedInputFile(graph_image, filename="water_chart.png"),
-        caption="График потребления воды"
-    )
-
-
-@router.message(Command(SHOW_CALORIES_CHART))
-async def fake(message: types.Message):
-    user_id = message.from_user.id
-
-    if get_active_days(user_id) < 2:
-        await message.answer("Данная функция пока недоступна, Вы должны иметь не менее 2 активных дней.")
-        return
-
-    dates, logged_calories = get_stats(user_id, 'logged_calories')
-    graph_image = create_calories_chart(user_id, dates, logged_calories)
-    await message.reply_photo(
-        photo=BufferedInputFile(graph_image, filename="calories_chart.png"),
-        caption="График потребления калорий"
-    )
 
 
 @router.message(ProfileSetup.weight, F.text)
@@ -146,112 +80,54 @@ async def process_city(message: types.Message, state: FSMContext):
         return
 
     user_data = await state.get_data()
+    user_data["city"] = city
     user_id = message.from_user.id
 
-    users[user_id] = {
-        "weight": user_data.get("weight"),
-        "height": user_data.get("height"),
-        "age": user_data.get("age"),
-        "activity": user_data.get("activity"),
-        "city": message.text.capitalize(),
-        "daily_norm": {
-            "water_goal": user_data.get("weight") * 30 + user_data.get("activity") * 10,
-            "calorie_goal": (
-                    10 * user_data.get("weight")
-                    + 6.25 * user_data.get("height")
-                    - 5 * user_data.get("age")
-            ),
-        },
-        "stats": {},
-    }
-
+    add_user(user_id, user_data)
     await set_norms_for_day(user_id, city)
     await message.answer("Профиль успешно настроен! Используйте /check_progress для проверки прогресса.")
     await state.clear()
 
 
-async def generate_fake_date(user_id: int, days_before: int):
-    for day_before in range(days_before):
-        day = datetime.now().date() - timedelta(days=day_before)
-        ensure_statistics_exists(user_id, day)
+@router.message(Command(SHOW_WATER_CHART))
+async def show_water_chart(message: types.Message):
+    log_command(SHOW_WATER_CHART, message.from_user.id, message.from_user.username)
 
-        # add random amount of calories
-        add_calories(user_id, day, random.randint(1000, 5000))
+    user_id = message.from_user.id
 
-        # add random amount of water
-        add_water(user_id, day, random.randint(1000, 5000))
+    if get_active_days(user_id) < 2:
+        await message.answer("Данная функция пока недоступна, Вы должны иметь не менее 2 активных дней.")
+        return
 
-
-async def set_norms_for_day(user_id: int, city: str):
-    today = datetime.now().date()
-
-    ensure_statistics_exists(user_id, today)
-    await add_water_goal_for_day(user_id, today, city)
-    add_calorie_goal_for_day(user_id, today)
+    dates, logged_water = get_stats(user_id, 'logged_water')
+    graph_image = create_water_chart(user_id, dates, logged_water)
+    await message.reply_photo(
+        photo=BufferedInputFile(graph_image, filename="water_chart.png"),
+        caption="График потребления воды"
+    )
 
 
-async def add_water_goal_for_day(user_id: int, date: date, city):
-    weather_data = await weather_client.get_weather_async(city)
-    temperature = weather_data["main"]["temp"]
+@router.message(Command(SHOW_CALORIES_CHART))
+async def show_calories_chart(message: types.Message):
+    log_command(SHOW_CALORIES_CHART, message.from_user.id, message.from_user.username)
 
-    users[user_id]["stats"][date]["water_goal"] = (users[user_id]["daily_norm"]["water_goal"] +
-                                                   (500 if temperature and temperature > 25 else 0))
+    user_id = message.from_user.id
 
+    if get_active_days(user_id) < 2:
+        await message.answer("Данная функция пока недоступна, Вы должны иметь не менее 2 активных дней.")
+        return
 
-def add_calorie_goal_for_day(user_id: int, date: date):
-    activity_level = users[user_id]['activity']
-    users[user_id]["stats"][date]["calorie_goal"] = (users[user_id]["daily_norm"]["calorie_goal"] +
-                                                     (300 if activity_level > 60 else 0))
-
-
-def get_stats(user_id, key):
-    stats = users[user_id]['stats']
-    dates = list(stats.keys())
-    logged_water = [stats[day][key] for day in dates]
-    return dates, logged_water
-
-
-def get_active_days(user_id):
-    stats = users[user_id]['stats']
-    return len(list(stats.keys()))
-
-
-def create_water_chart(user_id, dates, logged_water):
-    plt.figure(figsize=(10, 5))
-    plt.plot(dates, logged_water, marker='o', linestyle='-', color='b', label='Суточное потребление (мл)')
-    plt.axhline(y=users[user_id]['daily_norm']['water_goal'], color='r', linestyle='--', label='Суточная норма (мл)')
-    plt.title("Потребление воды")
-    plt.xlabel("Дата")
-    plt.ylabel("Количество воды (мл)")
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.tight_layout()
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    plt.close()
-    return buf.read()
-
-
-def create_calories_chart(user_id, dates, logged_water):
-    plt.figure(figsize=(10, 5))
-    plt.plot(dates, logged_water, marker='o', linestyle='-', color='b', label='Суточное потребление (ккал)')
-    plt.axhline(y=users[user_id]['daily_norm']['calorie_goal'], color='r', linestyle='--', label='Суточная норма (ккал)')
-    plt.title("Потребление калорий")
-    plt.xlabel("Дата")
-    plt.ylabel("Количество (ккал)")
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.tight_layout()
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    plt.close()
-    return buf.read()
+    dates, logged_calories = get_stats(user_id, 'logged_calories')
+    graph_image = create_calories_chart(user_id, dates, logged_calories)
+    await message.reply_photo(
+        photo=BufferedInputFile(graph_image, filename="calories_chart.png"),
+        caption="График потребления калорий"
+    )
 
 
 @router.message(Command(CHECK_PROGRESS))
 async def check_progress(message: types.Message):
+    log_command(CHECK_PROGRESS, message.from_user.id, message.from_user.username)
     user_id = message.from_user.id
     today = datetime.now().date()
 
@@ -273,6 +149,7 @@ async def check_progress(message: types.Message):
 
 @router.message(Command(LOG_WATER))
 async def log_water(message: types.Message, command: CommandObject):
+    log_command(LOG_WATER, message.from_user.id, message.from_user.username)
     if not command.args:
         await message.answer('Пожалуйста, введите аргументы команды (например, "/log_water 100").')
         return
@@ -299,6 +176,7 @@ async def log_water(message: types.Message, command: CommandObject):
 
 @router.message(Command(LOG_WORKOUT))
 async def log_workout(message: types.Message, command: CommandObject):
+    log_command(LOG_WORKOUT, message.from_user.id, message.from_user.username)
     if not command.args:
         await message.answer('Пожалуйста, введите аргументы команды (например, "/log_workout бег 30").')
         return
@@ -344,6 +222,7 @@ async def log_workout(message: types.Message, command: CommandObject):
 
 @router.message(Command(LOG_FOOD))
 async def log_food_name(message: types.Message, command: CommandObject, state: FSMContext):
+    log_command(LOG_FOOD, message.from_user.id, message.from_user.username)
     if not command.args:
         await message.answer('Пожалуйста, введите название продукта (например, "/log_food банан").')
         return
@@ -391,53 +270,28 @@ async def log_food_amount(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-def is_user_exists(user_id: int):
-    return user_id in users
+@router.message(Command("users"))
+async def temp(message: types.Message):
+    x = users
+    await message.reply(str(x))
 
 
-async def check_city(city: str):
-    city = city.lower().capitalize().strip()
-
-    if not city.isalpha() or await weather_client.is_city_exists(city):
-        return None
-
-    return city
+@router.message(Command("fake"))
+async def fake(message: types.Message):
+    await generate_fake_date(message.from_user.id, 7)
+    await message.reply("ok")
 
 
-def ensure_statistics_exists(user_id: int, date: date):
-    if date not in users[user_id]["stats"]:
-        users[user_id]["stats"][date] = {
-            "logged_water": 0,
-            "additional_water": 0,
-            "logged_calories": 0,
-            "burned_calories": 0,
-        }
+async def generate_fake_date(user_id: int, days_before: int):
+    for day_before in range(days_before):
+        day = datetime.now().date() - timedelta(days=day_before)
+        ensure_statistics_exists(user_id, day)
 
+        # add random amount of calories
+        add_calories(user_id, day, random.randint(1000, 5000))
 
-def add_water(user_id: int, date: date, volume: float):
-    users[user_id]["stats"][date]["logged_water"] += volume
-
-
-def inc_water_norm(user_id: int, date: date, volume: float):
-    users[user_id]["stats"][date]["additional_water"] += volume
-
-
-def burn_calories(user_id: int, date: date, amount: float):
-    users[user_id]["stats"][date]["burned_calories"] += amount
-
-
-def add_calories(user_id: int, date: date, amount: float):
-    users[user_id]["stats"][date]["logged_calories"] += amount
-
-
-def get_user_statistic_and_profile(user_id: int, date: date):
-    stats = users[user_id]["stats"][date]
-    profile = users[user_id]
-    return stats, profile
-
-
-def get_user_basenorm(user_id: int):
-    return users[user_id]["daily_norm"]
+        # add random amount of water
+        add_water(user_id, day, random.randint(1000, 5000))
 
 
 def setup_handlers(dp: Dispatcher):
