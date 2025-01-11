@@ -1,10 +1,6 @@
 from aiogram.fsm.state import State, StatesGroup
 
 
-class System(StatesGroup):
-    default = State()
-
-
 class ProfileSetup(StatesGroup):
     weight = State()
     height = State()
