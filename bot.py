@@ -14,7 +14,7 @@ setup_handlers(dp)
 
 
 async def main():
-    print("Бот запущен!")
+    print("Бот запущен! (автор Лотц. Н.К.)")
     await dp.start_polling(bot, skip_updates=True)
 
 if __name__ == "__main__":
