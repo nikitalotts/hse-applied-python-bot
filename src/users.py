@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, date, timedelta
-from api import WeatherApiClient
-from config import OPEN_WEATHER_MAP_TOKEN
+from src.api import WeatherApiClient
+from src.config import OPEN_WEATHER_MAP_TOKEN
 
 users = {}
 

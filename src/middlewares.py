@@ -2,8 +2,8 @@ from typing import Dict, Any, Awaitable, Callable
 
 from aiogram import BaseMiddleware, Dispatcher
 from aiogram.types import Message
-from handlers import is_user_exists
-from commands import *
+from src.handlers import is_user_exists
+from src.commands import *
 
 
 class ProfileRequiredMiddleware(BaseMiddleware):

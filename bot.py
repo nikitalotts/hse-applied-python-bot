@@ -2,9 +2,9 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config import BOT_TOKEN
-from handlers import setup_handlers
-from middlewares import setup_middleware
+from src.config import BOT_TOKEN
+from src.handlers import setup_handlers
+from src.middlewares import setup_middleware
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())

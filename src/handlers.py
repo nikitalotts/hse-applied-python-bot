@@ -3,11 +3,11 @@ from aiogram import types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile
 from aiogram.filters import Command, CommandObject
-from states import ProfileSetup, FoodLogging
-from commands import *
-from utils import *
-from users import *
-from config import ADMIN_USER_ID
+from src.states import ProfileSetup, FoodLogging
+from src.commands import *
+from src.utils import *
+from src.users import *
+from src.config import ADMIN_USER_ID
 
 router = Router()
 

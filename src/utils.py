@@ -1,9 +1,9 @@
 import io
 import matplotlib.pyplot as plt
-from logger import get_logger
-from config import OPEN_WEATHER_MAP_TOKEN, WORKOUT_API_TOKEN
-from api import WeatherApiClient, WorkoutApiClient, ProductsApiClient
-from users import get_user_daily_calorie_goal, get_user_daily_water_goal
+from src.logger import get_logger
+from src.config import OPEN_WEATHER_MAP_TOKEN, WORKOUT_API_TOKEN
+from src.api import WeatherApiClient, WorkoutApiClient, ProductsApiClient
+from src.users import get_user_daily_calorie_goal, get_user_daily_water_goal
 
 weather_client = WeatherApiClient(OPEN_WEATHER_MAP_TOKEN)
 workout_client = WorkoutApiClient(WORKOUT_API_TOKEN)
