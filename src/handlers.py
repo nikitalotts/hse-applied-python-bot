@@ -33,6 +33,7 @@ async def help(message: types.Message):
         "/check_progress — Проверить прогресс за сегодня\n"
         "/show_water_chart — Показать график потребления воды\n"
         "/show_calories_chart — Показать график потребления калорий\n"
+        # если пользоваль админ - добавляем ему служебные команды, иначе - нет
         f"{'/fake — (Служ.) Сгенерировать тестовые данные для графика' if message.from_user.id == ADMIN_USER_ID else ''}"
     )
 
@@ -151,15 +152,17 @@ async def check_progress(message: types.Message):
 
     stats, profile = get_user_statistic_and_profile(user_id, today)
 
+    calorie_goal_for_day = get_calorie_goal_for_day(user_id, today)
+
     await message.answer(
         f"📊 Прогресс:\n\n"
         f"Вода:\n"
         f"- Выпито: {stats['logged_water']} мл из {stats['water_goal'] + stats['additional_water']} мл.\n"
         f"- Осталось: {stats['water_goal'] + stats['additional_water'] - stats['logged_water']} мл.\n\n"
         f"Калории:\n"
-        f"- Потреблено: {stats['logged_calories']} ккал из {stats['calorie_goal']} ккал.\n"
+        f"- Потреблено: {stats['logged_calories']} ккал из {stats['calorie_goal']} ккал. (дневная норма на сегодня)\n"
         f"- Сожжено: {stats['burned_calories']} ккал.\n"
-        f"- Баланс: {stats['logged_calories'] - stats['burned_calories']} ккал."
+        f"- Баланс (дневная норма - потреблено + сожжено): {calorie_goal_for_day - stats['logged_calories'] + stats['burned_calories']} ккал."
     )
 
 
@@ -225,13 +228,18 @@ async def log_workout(message: types.Message, command: CommandObject):
     ensure_statistics_exists(user_id, today)
 
     burn_calories(user_id, today, calories)
+    added_calories = inc_calorie_goal_for_day(user_id, today, activity, calories)
 
-    text = f"{activity} {duration} минут — {calories} ккал."
+    text = f"{activity} {duration} минут — {calories} ккал.\n"
 
+    # Учитывает расход воды на тренировке (дополнительные 200 мл за каждые 30 минут)
     additonal_water = (duration // 30) * 200
     if additonal_water > 0:
-        text += f" Дополнительно: выпейте {additonal_water} мл воды."
+        text += f" Дополнительно: выпейте {additonal_water} мл воды.\n"
         inc_water_norm(user_id, today, additonal_water)
+
+    if added_calories > 0:
+        text += f" Дополнительно: к дневной нормы было добавлено {added_calories} ккал."
 
     await message.answer(text)
 
@@ -288,8 +296,11 @@ async def log_food_amount(message: types.Message, state: FSMContext):
 
 @router.message(Command(FAKE))
 async def fake(message: types.Message):
+    """Метод для генерации фейковых данных о воде и калориях по дням.
+     Доступен только админу."""
     log_command(FAKE, message.from_user.id, message.from_user.username)
     user_id = message.from_user.id
+    # если пользователь не админ, то ничего не делаем
     if user_id != ADMIN_USER_ID:
         return
     await generate_fake_date(user_id, 7)

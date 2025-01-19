@@ -40,6 +40,7 @@ class WeatherApiClient:
 
 class ProductsApiClient:
     async def get_product_info(self, product: str) -> Optional[Dict[str, Any]]:
+        # api лучше работает на английском, поэтому перед запросом переводим название упражнения
         product_name = await translate(product)
         url = f"https://world.openfoodfacts.org/cgi/search.pl?action=process&search_terms={product_name}&json=true"
         async with aiohttp.ClientSession() as session:
@@ -74,6 +75,8 @@ class WorkoutApiClient:
             raise RequestException("Not valid API key")
 
     async def get_exercise_info(self, exercise_name: str) -> Optional[Dict[str, Any]]:
+        # данное api работает только с английским языком, поэтмоу переводим
+        # название упражнения перед запросом
         exercise = await translate(exercise_name)
         url = f"https://api.api-ninjas.com/v1/caloriesburned?activity={exercise}"
         async with aiohttp.ClientSession(headers={'X-Api-Key': self.api_key}) as session:
@@ -93,6 +96,7 @@ class WorkoutApiClient:
 
 
 async def translate(text: str, destination='en') -> str:
+    """Метод для перевода текста"""
     async with Translator() as translator:
         translation = await translator.translate(text, dest=destination)
         return translation.text
@@ -121,7 +125,7 @@ def test_products_api_client(product: str):
     async def test_get_food_info():
         product_client = ProductsApiClient()
         search_query = await translate(product)
-        result = await product_client.get_food_info(search_query)
+        result = await product_client.get_product_info(search_query)
         if result is None:
             print("No product information found.")
         elif "error" in result:

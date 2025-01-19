@@ -7,8 +7,13 @@ users = {}
 
 weather_client = WeatherApiClient(OPEN_WEATHER_MAP_TOKEN)
 
+HIGH_INTENSIVE_TRAINING_ACTIVITIES = ["бег", "плавание", "прыжки"]
+
 
 def add_user(user_id: int, user_data: dict):
+
+    # структура отличается от того, что в задании,
+    # для того, чтобы можно было хранить статистику по дням и изменять дневные нормы
     users[user_id] = {
         "weight": user_data.get("weight"),
         "height": user_data.get("height"),
@@ -16,6 +21,8 @@ def add_user(user_id: int, user_data: dict):
         "activity": user_data.get("activity"),
         "city": user_data.get("city").capitalize(),
         "daily_norm": {
+            # Вес×30мл/кг +
+            # 10 мл за каждую минуту средней активности в день (вместо "# +500мл воды за каждые 30 минут активности")
             "water_goal": user_data.get("weight") * 30 + user_data.get("activity") * 10,
             "calorie_goal": (
                     10 * user_data.get("weight")
@@ -80,13 +87,30 @@ async def add_water_goal_for_day(user_id: int, date: date, city):
     temperature = weather_data["main"]["temp"]
 
     users[user_id]["stats"][date]["water_goal"] = (users[user_id]["daily_norm"]["water_goal"] +
+                                                    # +500−1000мл  за жаркую погоду (> 25°C).
                                                    (500 if temperature and temperature > 25 else 0))
+
+
+def get_calorie_goal_for_day(user_id: int, date: date):
+    return users[user_id]["stats"][date]["calorie_goal"]
 
 
 def add_calorie_goal_for_day(user_id: int, date: date):
     activity_level = users[user_id]['activity']
     users[user_id]["stats"][date]["calorie_goal"] = (users[user_id]["daily_norm"]["calorie_goal"] +
+                                                     # +300 кал за высокую активность (> 60 мин/день).
                                                      (300 if activity_level > 60 else 0))
+
+
+def inc_calorie_goal_for_day(user_id: int, date: date, activity: str, burned_calories: int):
+
+    coef = 0.8 if activity.strip().lower() in HIGH_INTENSIVE_TRAINING_ACTIVITIES else 0.5
+
+    # добавляем к дневной норме число калорий, сожженных на тренировке
+    # с коэффициентом 0.8 если это высокоинтенсивная тренировка, 0.5 иначе
+    users[user_id]["stats"][date]["calorie_goal"] += coef * burned_calories
+
+    return coef * burned_calories
 
 
 def get_stats(user_id, key):
